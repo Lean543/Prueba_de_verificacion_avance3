@@ -31,13 +31,28 @@ module top;
 
     assign idle_dbg = DUT.core0.IDLE;
     assign ifc_riscv_obj.idleproc = idle_dbg;
-  
+
   	assign addr = DUT.core0.IADDR;
     assign ifc_riscv_obj.addr = addr;
-  
-  	assign data = DUT.core0.IDATA;
+
+  	// XIDATA (no IDATA) es la instruccion ya latcheada en la etapa de decode:
+  	// esta exactamente alineada, ciclo a ciclo, con PC e IDLE/FLUSH, que es lo
+  	// que necesita el monitor para poblar item.pc y filtrar burbujas de flush.
+  	assign data = DUT.core0.XIDATA;
     assign ifc_riscv_obj.data = data;
-	
+
+  	// PC arquitectonico de la instruccion en XIDATA (mismo registro que usa
+  	// el core internamente para AUIPC/branch target/JAL, ej. PCSIMM = PC+SIMM).
+  	assign ifc_riscv_obj.pc = DUT.core0.PC;
+
+  	// Espejo de la memoria de datos del DUT, para verificar STORE (SW).
+  	genvar m;
+    generate
+        for(m=0; m<1024; m=m+1) begin
+            assign ifc_riscv_obj.mem[m] = DUT.MEM[m];
+        end
+    endgenerate
+
   	/*//estimulos para el procesador que se envian por la interfaz virtual
     initial begin
       

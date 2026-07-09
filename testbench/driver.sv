@@ -20,23 +20,15 @@ class riscv_driver extends uvm_driver #(riscv_item); //usa get_next_item() / get
           `uvm_fatal(get_type_name(), "No se pudo obtener preload en el driver")
     endfunction
 
-    task aplicar_reset();
+    task aplicar_reset(time duracion = 20ns);
 
-        ifc_riscv_obj.aplicar_reset();
+        ifc_riscv_obj.aplicar_reset(duracion);
 
     endtask
 
-    task variar_reloj();
+    task cambiar_clk(time periodo);
 
-        ifc_riscv_obj.cambiar_periodo(4ns);
-
-        #500;
-
-        ifc_riscv_obj.cambiar_periodo(1ns);
-
-        #500;
-
-        ifc_riscv_obj.cambiar_periodo(2ns);
+        ifc_riscv_obj.cambiar_periodo(periodo);
 
     endtask
 

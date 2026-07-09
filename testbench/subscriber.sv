@@ -51,6 +51,24 @@ class riscv_subscriber extends uvm_subscriber #(analysis_item);
       bins r_tipo = {7'b0110011};
       bins i_tipo = {7'b0010011};
       bins lui    = {7'b0110111};
+      bins auipc  = {7'b0010111};
+      bins load   = {7'b0000011};
+      bins store  = {7'b0100011};
+      bins branch = {7'b1100011};
+      bins jal    = {7'b1101111};
+      bins jalr   = {7'b1100111};
+    }
+
+    // Solo tiene sentido cuando opcode==BRANCH (1100011): las 6 condiciones
+    // de salto codificadas en funct3.
+    cp_branch_cond : coverpoint funct3 iff (opcode == 7'b1100011) {
+      option.comment = "Condicion de branch cubierta";
+      bins beq  = {3'b000};
+      bins bne  = {3'b001};
+      bins blt  = {3'b100};
+      bins bge  = {3'b101};
+      bins bltu = {3'b110};
+      bins bgeu = {3'b111};
     }
 
     cp_shift : coverpoint is_shift {
@@ -139,9 +157,13 @@ class riscv_subscriber extends uvm_subscriber #(analysis_item);
     // Muestreo del covergroup
     instruction_cg.sample();
 
-    // Validación de registros
-    assert(rd < 16)
-      else `uvm_error(get_type_name(), $sformatf("RD inválido: %0d", rd))
+    // Validación de registros. instruction[11:7] solo es un indice de
+    // registro real cuando la instruccion escribe rd; en STORE (0100011) y
+    // BRANCH (1100011) esos mismos bits son parte del inmediato
+    // (imm_s[4:0] / imm_b[4:1|11]) y pueden exceder 15 legitimamente.
+    if (opcode != 7'b0100011 && opcode != 7'b1100011)
+      assert(rd < 16)
+        else `uvm_error(get_type_name(), $sformatf("RD inválido: %0d", rd))
 
     if (opcode == 7'b0110011 || opcode == 7'b0010011)
       assert(rs1 < 16)
@@ -171,6 +193,8 @@ class riscv_subscriber extends uvm_subscriber #(analysis_item);
     `uvm_info(get_type_name(), $sformatf("Cobertura RD  = %0.2f%%", instruction_cg.cp_rd.get_coverage()), UVM_NONE)
 
     `uvm_info(get_type_name(), $sformatf("Cobertura OPCODE = %0.2f%%", instruction_cg.cp_opcode.get_coverage()), UVM_NONE)
+
+    `uvm_info(get_type_name(), $sformatf("Cobertura condicion de BRANCH = %0.2f%%", instruction_cg.cp_branch_cond.get_coverage()), UVM_NONE)
 
   endfunction
 

@@ -12,7 +12,7 @@
 // Instrucciones soportadas actualmente:
 //   - Tipo R   : ADD, SUB, AND, OR, XOR, SLL, SRL, SRA, SLT, SLTU
 //   - Tipo I   : ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI
-//   - Tipo U   : LUI
+//   - Tipo U   : LUI, AUIPC
 //   - Loads    : LB, LH, LW, LBU, LHU
 //   - Tipo S   : SB, SH, SW
 //   - Tipo B   : BEQ, BNE, BLT, BGE, BLTU, BGEU
@@ -30,11 +30,12 @@
 //      result = 32'hDEADBEEF y executed_op indicando "no soportada".
 //
 // CONTRATO DE SALIDA HACIA EL CHECKER (ver también analysis_item.sv):
-//   - Si mem_we=1        -> comparar mem_addr/mem_wdata/mem_size, NO rd
-//   - Si mem_re=1        -> comparar expected_rd/expected_result (dato leído)
-//   - Si opcode es branch -> NO comparar rd, comparar expected_next_pc
-//   - En cualquier otro caso -> comparar expected_rd/expected_result y
-//     expected_next_pc (debe ser pc+4)
+//   - Si writes_rd=1 -> comparar expected_rd/expected_result contra regs[]
+//   - Si mem_we=1     -> comparar mem_addr/mem_wdata contra la memoria del DUT, NO rd
+//   - writes_rd=0 para STORE y BRANCH (instruction[11:7] ahí es inmediato, no rd)
+//   - Siempre         -> expected_next_pc de esta transacción debe igualar
+//     el pc de la transacción siguiente (branch tomado/no tomado, JAL, JALR
+//     o flujo normal pc+4)
 //=============================================================================
 class riscv_scoreboard extends uvm_scoreboard;
 
@@ -51,9 +52,14 @@ class riscv_scoreboard extends uvm_scoreboard;
     logic [31:0] instruction;
     logic [31:0] regf [15:0];   // Banco de registros shadow (16 registros)
 
-    // Memoria shadow, usada por loads/stores.
-    // Ajustar la profundidad al mapa de memoria real del DUT.
-    logic [31:0] mem [0:16383];
+    // Memoria shadow, usada por loads/stores. Indexada por palabra
+    // (mem_addr[11:2]), igual que el DUT real (RTL/darksocv.v:
+    // MEM[DADDR[MLEN-1:2]] con MLEN=12 -> 1024 palabras de 32 bits = 4KB).
+    // Usar el mismo recorte de bits que el DUT hace que las direcciones
+    // fuera de rango (o negativas, ya que imm_i/imm_s no estan acotados)
+    // hagan wraparound exactamente igual que en hardware, en vez de
+    // producir un índice inválido.
+    logic [31:0] mem [0:1023];
 
     // Buffer para compensar el desfase de pipeline antes de enviar al checker
     analysis_item pending_queue[$];
@@ -154,6 +160,7 @@ class riscv_scoreboard extends uvm_scoreboard;
         t.mem_wdata    = 0;
         t.mem_size     = 0;
         t.branch_taken = 0;
+        t.writes_rd    = 1; // por defecto todo tipo escribe rd, salvo STORE/BRANCH (ver abajo)
         result         = 0;
 
         case (opcode)
@@ -229,6 +236,20 @@ class riscv_scoreboard extends uvm_scoreboard;
             end
 
             //=============================================================
+            // Tipo U (0010111): AUIPC -- rd = pc + (imm << 12)
+            //=============================================================
+            7'b0010111: begin
+                if (rd == 0) begin
+                    result = 0;
+                    t.executed_op = "RD=0 (ignorada)";
+                end else begin
+                    regf[rd] = t.pc + {instruction[31:12], 12'b0};
+                    result   = regf[rd];
+                    t.executed_op = "AUIPC";
+                end
+            end
+
+            //=============================================================
             // LOAD (0000011): LB, LH, LW, LBU, LHU
             // Dirección efectiva = regf[rs1] + imm_i
             //=============================================================
@@ -236,11 +257,11 @@ class riscv_scoreboard extends uvm_scoreboard;
                 mem_addr = regf[rs1] + imm_i;
 
                 case (funct3)
-                    3'b000: begin result = {{24{mem[mem_addr][7]}},  mem[mem_addr][7:0]};  t.executed_op = "LB";  end // sign-extend byte
-                    3'b001: begin result = {{16{mem[mem_addr][15]}}, mem[mem_addr][15:0]}; t.executed_op = "LH";  end // sign-extend half
-                    3'b010: begin result = mem[mem_addr];                                  t.executed_op = "LW";  end
-                    3'b100: begin result = {24'b0, mem[mem_addr][7:0]};                     t.executed_op = "LBU"; end // zero-extend byte
-                    3'b101: begin result = {16'b0, mem[mem_addr][15:0]};                    t.executed_op = "LHU"; end // zero-extend half
+                    3'b000: begin result = {{24{mem[mem_addr[11:2]][7]}},  mem[mem_addr[11:2]][7:0]};  t.executed_op = "LB";  end // sign-extend byte
+                    3'b001: begin result = {{16{mem[mem_addr[11:2]][15]}}, mem[mem_addr[11:2]][15:0]}; t.executed_op = "LH";  end // sign-extend half
+                    3'b010: begin result = mem[mem_addr[11:2]];                                        t.executed_op = "LW";  end
+                    3'b100: begin result = {24'b0, mem[mem_addr[11:2]][7:0]};                           t.executed_op = "LBU"; end // zero-extend byte
+                    3'b101: begin result = {16'b0, mem[mem_addr[11:2]][15:0]};                          t.executed_op = "LHU"; end // zero-extend half
                     default: begin result = 32'hDEADBEEF; t.executed_op = "LOAD no soportada"; end
                 endcase
 
@@ -260,19 +281,19 @@ class riscv_scoreboard extends uvm_scoreboard;
 
                 case (funct3)
                     3'b000: begin
-                        mem[mem_addr][7:0] = regf[rs2][7:0];
+                        mem[mem_addr[11:2]][7:0] = regf[rs2][7:0];
                         t.executed_op = "SB";
                         t.mem_size    = 1;
                         t.mem_wdata   = {24'b0, regf[rs2][7:0]};
                     end
                     3'b001: begin
-                        mem[mem_addr][15:0] = regf[rs2][15:0];
+                        mem[mem_addr[11:2]][15:0] = regf[rs2][15:0];
                         t.executed_op = "SH";
                         t.mem_size    = 2;
                         t.mem_wdata   = {16'b0, regf[rs2][15:0]};
                     end
                     3'b010: begin
-                        mem[mem_addr] = regf[rs2];
+                        mem[mem_addr[11:2]] = regf[rs2];
                         t.executed_op = "SW";
                         t.mem_size    = 4;
                         t.mem_wdata   = regf[rs2];
@@ -280,9 +301,10 @@ class riscv_scoreboard extends uvm_scoreboard;
                     default: t.executed_op = "STORE no soportada";
                 endcase
 
-                t.mem_we   = 1;
-                t.mem_addr = mem_addr;
-                result     = 0; // los stores no escriben rd
+                t.mem_we    = 1;
+                t.mem_addr  = mem_addr;
+                t.writes_rd = 0; // los stores no escriben rd (instruction[11:7] es imm_s[4:0])
+                result      = 0;
             end
 
             //=============================================================
@@ -302,7 +324,8 @@ class riscv_scoreboard extends uvm_scoreboard;
 
                 if (branch_cond) next_pc = t.pc + imm_b;
                 t.branch_taken = branch_cond;
-                result = 0; // los branches no escriben rd
+                t.writes_rd    = 0; // los branches no escriben rd (instruction[11:7] es imm_b[4:1|11])
+                result         = 0;
             end
 
             //=============================================================
@@ -351,7 +374,7 @@ class riscv_scoreboard extends uvm_scoreboard;
             7'b0100011:                         t.imm_val = imm_s; // S-type
             7'b1100011:                         t.imm_val = imm_b; // B-type
             7'b1101111:                         t.imm_val = imm_j; // J-type
-            7'b0110111:                         t.imm_val = {instruction[31:12], 12'b0}; // U-type
+            7'b0110111, 7'b0010111:             t.imm_val = {instruction[31:12], 12'b0}; // U-type: LUI/AUIPC
             default:                            t.imm_val = 0;
         endcase
 

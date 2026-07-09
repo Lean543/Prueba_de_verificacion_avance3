@@ -26,39 +26,36 @@ class riscv_monitor extends uvm_monitor;
     analysis_item item;
 
     // Espera a que el procesador salga de reset/idle
-    //@(negedge ifc_riscv_obj.idleproc);
     wait (ifc_riscv_obj.addr != 32'h0);
-    //@(negedge ifc_riscv_obj.idleproc);
-
-    //pipeline delay
-    //repeat (1) @(posedge ifc_riscv_obj.clk);
-    //lastaddr = 32'h0;
 
     while (ifc_riscv_obj.data != 32'h0) begin
 
         @(posedge ifc_riscv_obj.clk);
 
-        //if (ifc_riscv_obj.addr != lastaddr) begin
-
-            //lastaddr = ifc_riscv_obj.addr;
-
-            // Esperar a que la ROM entregue la instrucción
-            //@(posedge ifc_riscv_obj.clk);
+        // ifc_riscv_obj.idleproc (DUT.core0.IDLE = |FLUSH) esta alineado,
+        // ciclo a ciclo, con ifc_riscv_obj.data (XIDATA) e ifc_riscv_obj.pc
+        // (PC). Cuando esta en 1, la instruccion que acaba de llegar a
+        // XIDATA es una burbuja descartada por un salto/branch tomado (el
+        // pipeline de 3 etapas ya redirigio el fetch, pero XIDATA todavia
+        // arrastra 1-2 ciclos de instrucciones "fantasma" que el DUT nunca
+        // llega a ejecutar). No se debe reportar como instruccion real.
+        if (!ifc_riscv_obj.idleproc) begin
 
             item = analysis_item::type_id::create("item");
             item.instruction = ifc_riscv_obj.data;
-          	
-          	$display("%0t PC_core=%d entrando_pipeline=%08h",
-               $time,
-               ifc_riscv_obj.addr,
-               ifc_riscv_obj.data);
+            item.pc          = ifc_riscv_obj.pc;
+
+            $display("%0t PC_core=%08h entrando_pipeline=%08h",
+                 $time,
+                 ifc_riscv_obj.pc,
+                 ifc_riscv_obj.data);
 
             ap.write(item);
 
-        //end
+        end
 
     end
-    
+
     repeat (2) @(posedge ifc_riscv_obj.clk); //esperar a 2 ultimas instrucciones
 
   endtask
