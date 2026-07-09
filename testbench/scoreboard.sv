@@ -44,6 +44,8 @@ class riscv_scoreboard extends uvm_scoreboard;
     uvm_analysis_imp #(analysis_item, riscv_scoreboard) analysis_export;
     uvm_analysis_port #(analysis_item)                  checker_port;
 
+    virtual ifc_riscv ifc_riscv_obj; // solo para sembrar mem[] con el estado inicial real del DUT
+
     // Estado interno del modelo (persiste entre instrucciones)
     logic [31:0] result;
     logic [4:0]  rd;
@@ -61,6 +63,13 @@ class riscv_scoreboard extends uvm_scoreboard;
     // producir un índice inválido.
     logic [31:0] mem [0:1023];
 
+    // 1 una vez que mem[] se sembro con el contenido inicial real del DUT
+    // (ver write() / mem_seeded). Antes de eso mem[] queda en X (valor por
+    // defecto de un arreglo de logic no inicializado explicitamente), lo
+    // que hacia fallar TODO load cuya direccion no hubiera sido escrita
+    // antes por el propio programa generado.
+    bit mem_seeded;
+
     // Buffer para compensar el desfase de pipeline antes de enviar al checker
     analysis_item pending_queue[$];
 
@@ -73,16 +82,16 @@ class riscv_scoreboard extends uvm_scoreboard;
     endfunction
 
     function void build_phase(uvm_phase phase);
+        if (!uvm_config_db#(virtual ifc_riscv)::get(this, "", "ifc_riscv_obj", ifc_riscv_obj))
+            `uvm_fatal(get_type_name(), "No se pudo obtener ifc_riscv_obj en el scoreboard")
+
         result = 0;
         rd     = 0;
         rs1    = 0;
         rs2    = 0;
         for (int i = 0; i < 16; i++)
             regf[i] = 0;
-        // No se inicializa mem[] explícitamente por tamaño; se asume 0
-        // por defecto en simulación. Si el DUT arranca con memoria
-        // precargada, este modelo debe recibir la misma carga inicial
-        // (pendiente de definir mecanismo con el equipo de memoria).
+        mem_seeded = 0; // mem[] se siembra en write(), la primera vez que se procesa una instruccion
     endfunction
 
     //-------------------------------------------------------------------
@@ -94,6 +103,17 @@ class riscv_scoreboard extends uvm_scoreboard;
     //-------------------------------------------------------------------
     virtual function void write(analysis_item t);
         analysis_item to_send;
+
+        // Sembrar mem[] con el contenido inicial REAL del DUT (via el espejo
+        // ifc_riscv_obj.mem[], cableado en top.sv) la primera vez que se
+        // procesa una instruccion. Para ese momento el core ya empezo a
+        // buscar instrucciones, asi que darksocv.mem ya esta cargado en
+        // DUT.MEM[]. Sin esto, mem[] queda en X y todo LOAD de una direccion
+        // no escrita previamente por el propio programa generado falla.
+        if (!mem_seeded) begin
+            mem        = ifc_riscv_obj.mem;
+            mem_seeded = 1;
+        end
 
         instruction = t.instruction;
         ref_model(t);  // calcula todos los campos expected_/mem_/next_pc sobre t
