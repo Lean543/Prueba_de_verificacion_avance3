@@ -39,7 +39,14 @@ class riscv_monitor extends uvm_monitor;
         // pipeline de 3 etapas ya redirigio el fetch, pero XIDATA todavia
         // arrastra 1-2 ciclos de instrucciones "fantasma" que el DUT nunca
         // llega a ejecutar). No se debe reportar como instruccion real.
-        if (!ifc_riscv_obj.idleproc) begin
+        //
+        // ifc_riscv_obj.hlt se asierta durante el wait-state que insertan
+        // los LOAD (1 ciclo extra en este core). Mientras hlt=1, XIDATA/PC
+        // quedan CONGELADOS -- sin este chequeo, el mismo LOAD se captura
+        // dos veces (una por cada ciclo que permanece en XIDATA), lo que
+        // duplica esa transaccion en el scoreboard y rompe tanto el chequeo
+        // de flujo de PC como la sincronizacion del buffer de pipeline.
+        if (!ifc_riscv_obj.idleproc && !ifc_riscv_obj.hlt) begin
 
             item = analysis_item::type_id::create("item");
             item.instruction = ifc_riscv_obj.data;

@@ -41,6 +41,12 @@ module top;
   	// el core internamente para AUIPC/branch target/JAL, ej. PCSIMM = PC+SIMM).
   	assign ifc_riscv_obj.pc = DUT.core0.PC;
 
+  	// HLT: se asierta 1 ciclo durante el wait-state de un LOAD (declarado
+  	// en darksocv.v, no dentro de core0). XIDATA/PC quedan congelados
+  	// mientras HLT=1; el monitor lo usa para no capturar la misma
+  	// instruccion dos veces.
+  	assign ifc_riscv_obj.hlt = DUT.HLT;
+
   	// Espejo de la memoria de datos del DUT, para verificar STORE (SW).
   	genvar m;
     generate

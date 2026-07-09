@@ -91,7 +91,9 @@ class riscv_scoreboard extends uvm_scoreboard;
         rs2    = 0;
         for (int i = 0; i < 16; i++)
             regf[i] = 0;
-        mem_seeded = 0; // mem[] se siembra en write(), la primera vez que se procesa una instruccion
+        for (int i = 0; i < 1024; i++)
+            mem[i] = 32'h0; // valor por defecto documentado; write() la sobrescribe con lo real del DUT donde este definido
+        mem_seeded = 0; // mem[] se termina de sembrar en write(), la primera vez que se procesa una instruccion
     endfunction
 
     //-------------------------------------------------------------------
@@ -107,11 +109,18 @@ class riscv_scoreboard extends uvm_scoreboard;
         // Sembrar mem[] con el contenido inicial REAL del DUT (via el espejo
         // ifc_riscv_obj.mem[], cableado en top.sv) la primera vez que se
         // procesa una instruccion. Para ese momento el core ya empezo a
-        // buscar instrucciones, asi que darksocv.mem ya esta cargado en
-        // DUT.MEM[]. Sin esto, mem[] queda en X y todo LOAD de una direccion
-        // no escrita previamente por el propio programa generado falla.
+        // buscar instrucciones, asi que darksocv.mem ya deberia estar
+        // cargado en DUT.MEM[]. Solo se copian posiciones COMPLETAMENTE
+        // definidas (sin bits en X): en algunos simuladores DUT.MEM[] no
+        // termina de inicializarse en X fuera del programa cargado, y
+        // copiar esas X a ciegas contamina cualquier load/store que las
+        // toque despues. build_phase() ya dejo mem[] en 0 por defecto, que
+        // es lo que el DUT debería mostrar en esas posiciones de todos
+        // modos.
         if (!mem_seeded) begin
-            mem        = ifc_riscv_obj.mem;
+            for (int i = 0; i < 1024; i++)
+                if (^ifc_riscv_obj.mem[i] !== 1'bx)
+                    mem[i] = ifc_riscv_obj.mem[i];
             mem_seeded = 1;
         end
 
