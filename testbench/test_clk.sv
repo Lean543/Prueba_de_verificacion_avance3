@@ -10,13 +10,13 @@ class riscv_clock_test extends riscv_test;
 
         env.agent.cambiar_clk(4);
 
-        #500;
+        #200
 
-        env.agent.cambiar_clk(1);
+      	env.agent.cambiar_clk(5);
 
-        #500;
+        #350;
 
-        env.agent.cambiar_clk(2);
+      	env.agent.cambiar_clk(6);
 
     endtask
 

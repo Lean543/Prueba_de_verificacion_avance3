@@ -55,9 +55,10 @@ class riscv_checker extends uvm_component;
             if (t.expected_result !== ifc_riscv_obj.regs[t.expected_rd]) begin
                 ok = 0;
                 `uvm_error(get_type_name(), $sformatf("ERROR rd=x%0d esperado=%08h obtenido=%08h", t.expected_rd, t.expected_result, ifc_riscv_obj.regs[t.expected_rd]))
-            end
+            end else begin
+          		`uvm_info(get_type_name(), $sformatf("rd=x%0d esperado=%08h obtenido=%08h", t.expected_rd, t.expected_result, ifc_riscv_obj.regs[t.expected_rd]), UVM_LOW)
+        	end
         end
-
         // 2) Memoria: solo aplica a STORE. Compara la palabra escrita en el
         //    espejo de memoria del DUT contra la que calculo el modelo de
         //    referencia.
@@ -66,6 +67,8 @@ class riscv_checker extends uvm_component;
             if (t.mem_wdata !== actual_mem_word) begin
                 ok = 0;
                 `uvm_error(get_type_name(), $sformatf("ERROR mem[%08h] esperado=%08h obtenido=%08h", t.mem_addr, t.mem_wdata, actual_mem_word))
+            end else begin
+          		`uvm_info(get_type_name(), $sformatf("mem[%08h] esperado=%08h obtenido=%08h", t.mem_addr, t.mem_wdata, actual_mem_word), UVM_LOW)
             end
         end
 
@@ -75,6 +78,8 @@ class riscv_checker extends uvm_component;
             if (prev_expected_next_pc !== t.pc) begin
                 ok = 0;
                 `uvm_error(get_type_name(), $sformatf("ERROR flujo de PC: esperado=%08h obtenido=%08h", prev_expected_next_pc, t.pc))
+            end else begin
+              	`uvm_info(get_type_name(), $sformatf("flujo de PC: esperado=%08h obtenido=%08h", prev_expected_next_pc, t.pc), UVM_LOW)
             end
         end
         have_prev             = 1;

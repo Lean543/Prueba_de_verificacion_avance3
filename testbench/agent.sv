@@ -25,7 +25,7 @@ class riscv_agent extends uvm_agent; //agente activo
 
     endfunction
   
-  	task aplicar_reset(time duracion = 20);
+  task aplicar_reset(time duracion = 100);
         driver.aplicar_reset(duracion);
     endtask
 

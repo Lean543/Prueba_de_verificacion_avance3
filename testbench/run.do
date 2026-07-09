@@ -1,4 +1,4 @@
-vsim +access+r -sv_seed random +UVM_TESTNAME=riscv_store_test +ENABLE_RESET +ENABLE_CLOCK;
+vsim +access+r -sv_seed random +UVM_TESTNAME=riscv_test;
 
 run -all;
 
