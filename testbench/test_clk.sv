@@ -8,7 +8,15 @@ class riscv_clock_test extends riscv_test;
 
     virtual task ejecutar_clock_test();
 
-        env.variar_reloj();
+        env.agent.cambiar_clk(4);
+
+        #500;
+
+        env.agent.cambiar_clk(1);
+
+        #500;
+
+        env.agent.cambiar_clk(2);
 
     endtask
 
