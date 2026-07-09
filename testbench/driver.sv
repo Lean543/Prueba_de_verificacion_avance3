@@ -18,6 +18,8 @@ class riscv_driver extends uvm_driver #(riscv_item); //usa get_next_item() / get
           `uvm_fatal(get_type_name(), "No se pudo obtener num_instructions en el driver")
         if(!uvm_config_db#(int)::get(this, "", "preload", preload))
           `uvm_fatal(get_type_name(), "No se pudo obtener preload en el driver")
+        if(!uvm_config_db#(virtual ifc_riscv)::get(this, "", "ifc_riscv_obj", ifc_riscv_obj))
+          `uvm_fatal(get_type_name(), "No se pudo obtener ifc_riscv_obj en el driver")
     endfunction
 
     task aplicar_reset(time duracion = 20ns);
