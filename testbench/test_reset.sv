@@ -10,7 +10,7 @@ class riscv_reset_test extends riscv_test;
 
         #500;
 
-        env.aplicar_reset();
+        env.agent.aplicar_reset();
 
     endtask
 

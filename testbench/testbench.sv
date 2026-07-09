@@ -27,3 +27,5 @@ import uvm_pkg::*;
 `include "test_store.sv"
 `include "test_branch.sv"
 `include "test_jump.sv"
+`include "test_reset.sv"
+`include "test_clk.sv"
