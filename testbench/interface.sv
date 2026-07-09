@@ -28,16 +28,21 @@ interface ifc_riscv;
     end
 
     //estimulos para el procesador que se envian por la interfaz virtual
+    //
+    // NOTA: antes este bloque terminaba con "#1000; res = 1'b1;", dejando
+    // res (XRES) asertado PARA SIEMPRE (nunca se volvia a bajar). RTL/darkpll.v
+    // requiere ~256 ciclos de reloj despues de CADA liberacion de reset antes
+    // de que el reset interno del core (RES) realmente baje (IRES/DRES son
+    // contadores de 8 bits encadenados). Con res atascado en 1, el core nunca
+    // sale de reset y no ejecuta nada -> el checker no recibe transacciones.
+    // Tambien se quito "clk = 1'b1;" de aca: competia con el generador de
+    // reloj de arriba por manejar la misma señal clk.
     initial begin
-            
-        clk = 1'b1;
+
         res = 1'b1;
 
         #10;
         res = 1'b0;
-
-        #1000;
-        res = 1'b1;
 
     end
 

@@ -4,21 +4,17 @@
 
 module top;
 
-    logic clk;
-    logic res;
   	logic idle_dbg;
   	logic [31:0] addr;
   	logic [31:0] data;
 
 	ifc_riscv ifc_riscv_obj();
-	
+
   	//instancia el dut
     darksocv DUT(
         .XCLK(ifc_riscv_obj.clk),
         .XRES(ifc_riscv_obj.res)
     );
-
-    always #1 clk = ~clk;
 
     genvar i;
 	//conexiones de las señales del core con la interfaz
