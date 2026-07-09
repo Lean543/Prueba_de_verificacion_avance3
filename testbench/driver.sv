@@ -37,16 +37,43 @@ class riscv_driver extends uvm_driver #(riscv_item); //usa get_next_item() / get
   	task run_phase(uvm_phase phase); //run se ejecuta al inicio de la simulacion sin ser llamado explicitamente
 
         riscv_item req; //instancia del sequence_item
+        int preload_fd;
+        bit [31:0] preload_instr;
+        bit [31:0] preload_instrs[$]; // preserva el programa semilla (ej. ADDI x1..x15=1..15)
+        int j;
+
       	//comprobacion del archivo de instrucciones desde aqui:
-      	instructions_file = $fopen("darksocv.mem","a");
+
+        // Preservar las 'preload' instrucciones ya presentes en darksocv.mem
+        // ANTES de truncar el archivo. Antes se abria en modo "a" (append):
+        // como $readmemh siempre llena MEM[] desde el inicio del archivo, si
+        // el archivo no se reinicia entre corridas, el bloque generado en
+        // ESTA corrida terminaba mas abajo en el archivo que las 1024
+        // palabras que $readmemh realmente carga, y nunca se ejecutaba -- se
+        // veian solo las instrucciones precargadas (siempre al inicio del
+        // archivo). Ahora se lee y preserva el seed, y se reescribe el
+        // archivo completo desde cero en cada corrida.
+        preload_fd = $fopen("darksocv.mem", "r");
+        if (preload_fd) begin
+            for (j = 0; j < preload; j++) begin
+                if ($fscanf(preload_fd, "%h", preload_instr) == 1)
+                    preload_instrs.push_back(preload_instr);
+            end
+            $fclose(preload_fd);
+        end
+        else
+            `uvm_warning(get_type_name(), "No se pudo leer darksocv.mem para preservar el preload")
+
+      	instructions_file = $fopen("darksocv.mem","w");
 
         if(!instructions_file)
           	`uvm_fatal(get_type_name(), "No se pudo abrir darksocv.mem")
-          
-        $fwrite(instructions_file,"\n");
+
+        foreach (preload_instrs[k])
+            $fwrite(instructions_file, "%h\n", preload_instrs[k]);
 
       	`uvm_info(get_type_name(), "Archivo darksocv.mem abierto", UVM_LOW)
-      
+
 
       	repeat (num_instructions) begin
           	seq_item_port.get_next_item(req); //recibe y se sincroniza con un ejercicio del sequencer
