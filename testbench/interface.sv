@@ -8,6 +8,14 @@ interface ifc_riscv;
     logic [31:0] data;
     logic [31:0] regs[16];
 
+    // PC arquitectonico de la instruccion actualmente decodificada (XIDATA),
+    // necesario para AUIPC, branch target, JAL y JALR.
+    logic [31:0] pc;
+
+    // Espejo de la memoria de datos del DUT (RTL/darksocv.v: MEM[0:2**MLEN/4-1]).
+    // 1024 palabras de 32 bits = 4KB, debe coincidir con MLEN=12 en RTL/config.vh.
+    logic [31:0] mem [0:1023];
+
     realtime periodo_clk = 2ns;
 
     // Generador de reloj
