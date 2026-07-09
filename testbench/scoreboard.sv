@@ -13,8 +13,8 @@
 //   - Tipo R   : ADD, SUB, AND, OR, XOR, SLL, SRL, SRA, SLT, SLTU
 //   - Tipo I   : ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI
 //   - Tipo U   : LUI, AUIPC
-//   - Loads    : LB, LH, LW, LBU, LHU
-//   - Tipo S   : SB, SH, SW
+//   - Loads    : LW
+//   - Tipo S   : SW
 //   - Tipo B   : BEQ, BNE, BLT, BGE, BLTU, BGEU
 //   - JAL, JALR
 //
@@ -279,18 +279,14 @@ class riscv_scoreboard extends uvm_scoreboard;
             end
 
             //=============================================================
-            // LOAD (0000011): LB, LH, LW, LBU, LHU
+            // LOAD (0000011): LW (unico load requerido por el plan)
             // Dirección efectiva = regf[rs1] + imm_i
             //=============================================================
             7'b0000011: begin
                 mem_addr = regf[rs1] + imm_i;
 
                 case (funct3)
-                    3'b000: begin result = {{24{mem[mem_addr[11:2]][7]}},  mem[mem_addr[11:2]][7:0]};  t.executed_op = "LB";  end // sign-extend byte
-                    3'b001: begin result = {{16{mem[mem_addr[11:2]][15]}}, mem[mem_addr[11:2]][15:0]}; t.executed_op = "LH";  end // sign-extend half
-                    3'b010: begin result = mem[mem_addr[11:2]];                                        t.executed_op = "LW";  end
-                    3'b100: begin result = {24'b0, mem[mem_addr[11:2]][7:0]};                           t.executed_op = "LBU"; end // zero-extend byte
-                    3'b101: begin result = {16'b0, mem[mem_addr[11:2]][15:0]};                          t.executed_op = "LHU"; end // zero-extend half
+                    3'b010: begin result = mem[mem_addr[11:2]]; t.executed_op = "LW"; end
                     default: begin result = 32'hDEADBEEF; t.executed_op = "LOAD no soportada"; end
                 endcase
 
@@ -302,36 +298,24 @@ class riscv_scoreboard extends uvm_scoreboard;
             end
 
             //=============================================================
-            // Tipo S (0100011): SB, SH, SW
+            // Tipo S (0100011): SW (unico store requerido por el plan)
             // Dirección efectiva = regf[rs1] + imm_s. No escribe rd.
             //=============================================================
             7'b0100011: begin
                 mem_addr = regf[rs1] + imm_s;
 
                 case (funct3)
-                    3'b000: begin
-                        mem[mem_addr[11:2]][7:0] = regf[rs2][7:0];
-                        t.executed_op = "SB";
-                        t.mem_size    = 1;
-                        t.mem_wdata   = {24'b0, regf[rs2][7:0]};
-                    end
-                    3'b001: begin
-                        mem[mem_addr[11:2]][15:0] = regf[rs2][15:0];
-                        t.executed_op = "SH";
-                        t.mem_size    = 2;
-                        t.mem_wdata   = {16'b0, regf[rs2][15:0]};
-                    end
                     3'b010: begin
                         mem[mem_addr[11:2]] = regf[rs2];
                         t.executed_op = "SW";
                         t.mem_size    = 4;
                         t.mem_wdata   = regf[rs2];
+                        t.mem_we      = 1;
+                        t.mem_addr    = mem_addr;
                     end
-                    default: t.executed_op = "STORE no soportada";
+                    default: t.executed_op = "STORE no soportada"; // no escribe memoria: mem_we queda en 0 para que el checker no compare
                 endcase
 
-                t.mem_we    = 1;
-                t.mem_addr  = mem_addr;
                 t.writes_rd = 0; // los stores no escriben rd (instruction[11:7] es imm_s[4:0])
                 result      = 0;
             end

@@ -103,10 +103,9 @@ class analysis_item extends uvm_sequence_item;
     // expected_result/expected_rd (los stores no escriben rd).
     bit mem_we;
 
-    // 1 si esta instrucción es un LOAD. Si es 1, el checker debe
-    // comparar expected_result/expected_rd (el dato leído ya extendido
-    // en signo/ceros según LB/LH/LW/LBU/LHU) contra lo que el DUT
-    // escribe en el registro destino.
+    // 1 si esta instrucción es un LOAD (LW). Si es 1, el checker debe
+    // comparar expected_result/expected_rd (la palabra leída de memoria)
+    // contra lo que el DUT escribe en el registro destino.
     bit mem_re;
 
     // Dirección efectiva de memoria (rs1 + immediato), válida
@@ -114,11 +113,10 @@ class analysis_item extends uvm_sequence_item;
     logic [31:0] mem_addr;
 
     // Dato a escribir en memoria, válido únicamente cuando mem_we=1.
-    // Ya recortado según el tamaño (byte/half/word) definido en mem_size.
     logic [31:0] mem_wdata;
 
-    // Tamaño del acceso a memoria en BYTES: 1 = byte, 2 = halfword,
-    // 4 = word. Válido cuando mem_we=1 o mem_re=1.
+    // Tamaño del acceso a memoria en BYTES. Siempre 4 (word), ya que
+    // el plan solo requiere LW/SW. Válido cuando mem_we=1 o mem_re=1.
     int mem_size;
 
     function new(string name = "analysis_item");
