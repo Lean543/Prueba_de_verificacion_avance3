@@ -12,6 +12,12 @@ interface ifc_riscv;
     // necesario para AUIPC, branch target, JAL y JALR.
     logic [31:0] pc;
 
+    // HLT del DUT (RTL/darksocv.v): se asierta durante el wait-state que
+    // insertan los LOAD (1 ciclo extra). Mientras HLT=1, XIDATA/PC quedan
+    // congelados; el monitor lo usa para no capturar la misma instruccion
+    // dos veces durante ese ciclo extra.
+    logic hlt;
+
     // Espejo de la memoria de datos del DUT (RTL/darksocv.v: MEM[0:2**MLEN/4-1]).
     // 1024 palabras de 32 bits = 4KB, debe coincidir con MLEN=12 en RTL/config.vh.
     logic [31:0] mem [0:1023];
