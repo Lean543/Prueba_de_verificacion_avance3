@@ -36,9 +36,16 @@ class riscv_env extends uvm_env;
 
       	agent.monitor.ap.connect(scoreboard.analysis_export); //conexion monitor con scoreboard mediante el puerto analysis_export
 
-      	agent.monitor.ap.connect(subscriber.analysis_export); //conexion monitor con suscriber mediante el puerto analysis_export
-
       	scoreboard.checker_port.connect(checker_obj.checker_port); //conexion checker con scoreboard mediante el puerto analysis_export
+
+        // El subscriber se alimenta de la MISMA salida del scoreboard que el
+        // checker (no del monitor): asi recibe la transaccion ya resuelta por
+        // el modelo de referencia, con branch_taken, expected_result,
+        // mem_addr/mem_wdata y expected_next_pc poblados, que los covergroups
+        // por funcion necesitan muestrear. Nota: las ultimas PIPELINE_DELAY=2
+        // instrucciones del programa quedan en el buffer del scoreboard y no
+        // se muestrean (impacto despreciable con programas de 400 instrucciones).
+        scoreboard.checker_port.connect(subscriber.analysis_export);
 	
         checker_obj.scoreboard = scoreboard; //para instancia del scoreboard en el checker
 
